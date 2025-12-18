@@ -1,4 +1,4 @@
-**Core Problem**
+### Core Problem
 
 Retail store managers and supply chain executives face a constant "optimization dilemma" concerning sales forecasting:
 
@@ -148,7 +148,7 @@ By integrating these insights and implementing the recommended strategies, the b
 This section reviews and compares the performance of all implemented models on the validation set. The comparison_df provides a structured overview of each model's effectiveness, sorted by their Root Mean Squared Error (RMSE).
 
 **Model Performance Metrics (Sorted by RMSE):**
-Model         MAE           MSE        RMSE  R-squared  \
+$Model         MAE           MSE        RMSE  R-squared  \
 5        XGBoostRegressor    0.341654      0.243767    0.493728   0.762109   
 7  Ensemble (RF+XGB+LGBM)    0.354917      0.258409    0.508339   0.747820   
 6      LightGBM Regressor    0.362230      0.267868    0.517560   0.738589   
@@ -165,7 +165,7 @@ Model         MAE           MSE        RMSE  R-squared  \
 0  365.365582  
 3  363.903054  
 2  339.661375  
-1  280.415772
+1  280.415772$
 **Analysis and Conclusions**
 
 The comparison table above highlights a clear distinction in performance between the traditional machine learning regression models (Linear Regression, RandomForestRegressor, XGBoostRegressor, LightGBM Regressor) and the time-series specific models (ARIMA, SARIMA, Prophet).
