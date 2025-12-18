@@ -47,10 +47,7 @@ def preprocess_input(data: dict, scaler, X_train_columns):
     # Drop 'Date' column as it's no longer needed after feature extraction
     input_df = input_df.drop(columns=['Date'], errors='ignore')
 
-    # One-hot encode categorical features, ensuring consistency with training data
-    # These categorical columns were converted to boolean by pd.get_dummies(drop_first=True)
-    # We need to recreate them for the new data. Create dummy columns with False first,
-    # then set True where appropriate. This handles cases where a category might be missing in new data.
+
     categorical_features = ['Store_Type', 'Location_Type', 'Region_Code', 'Discount']
     for col in categorical_features:
         if col in input_df.columns:
@@ -200,46 +197,6 @@ def predict():
         if preprocess_warnings:
             resp['warnings'] = preprocess_warnings
         return jsonify(resp)
-        # The target variable 'Sales' was scaled. Inverse transform the prediction if needed.
-        # To inverse transform, we need to create a dummy array with the scaled features,
-        # where the prediction is in the 'Sales' column, and then inverse_transform.
-        # This would require knowing the original numerical_features (including Sales)
-        # which was ['#Order', 'Sales', 'Sales_Rolling_Mean_7D'] and their order.
-        # For simplicity, we return the scaled prediction here. If original scale is needed,
-        # the scaler.inverse_transform logic needs careful reconstruction.
-
-        # To inverse transform the 'Sales' column, we need to know its original position in 'numerical_features'
-        # when the scaler_current was fitted on ['Store_id', 'Year', 'Month', 'DayOfWeek']
-        # This API assumes the target variable 'Sales' is independent and not part of scaler_current
-        # If Sales was part of the scaler used for X_train and y_train, we would need to handle this.
-        # However, looking at the notebook, `y_train` was 'Sales' directly, and `scaler_current` only transformed
-        # ['Store_id', 'Year', 'Month', 'DayOfWeek']. Therefore, the `model_xgb_final` predicts directly
-        # the scaled 'Sales' target, and inverse scaling `y_pred` is not straightforward with `scaler_current`.
-        # If the original 'Sales' values were used as `y_train`, then the predictions are already in the original scale.
-        # But since y_train was scaled (from `dataset['Sales'] = scaler.fit_transform(dataset[numerical_features])`),
-        # the prediction `prediction` is on the scaled target variable. Inverse scaling is needed.
-        
-        # Reconstruct dummy array for inverse_transform if Sales was scaled with scaler_current.
-        # Looking back at the notebook, numerical_features = ['#Order', 'Sales', 'Sales_Rolling_Mean_7D'] were scaled by the *first* scaler.
-        # Then y_train was assigned dataset['Sales'] (which was already scaled).
-        # The scaler_current was then fitted and transformed on ['Store_id', 'Year', 'Month', 'DayOfWeek'] for X_train.
-        # So, the output of model_xgb_final.predict(processed_data) *is* the scaled Sales value.
-        # To inverse transform this, we need the *original* scaler that was used on 'Sales'.
-        # This means we need to save *that* scaler too, or re-think the scaling strategy for y_train.
-        
-        # Assuming for now `model_xgb_final` predicts the scaled `Sales` values,
-        # and `scaler_current` is only for `X_train` features.
-        # To inverse transform the prediction, we would need the scaler that was originally applied to `Sales` (the first `scaler` initialized).
-        # Let's assume the task is to return the scaled prediction for now, or acknowledge the missing scaler for target.
-        
-        # For demonstration, we'll return the scaled prediction. If inverse transformation of 'Sales' is required,
-        # the original scaler used for 'Sales' needs to be loaded and applied.
-        
-        # Placeholder for inverse scaling if `Sales` was part of `scaler_current` or a separate `y_scaler` was available:
-        # sales_idx = numerical_features.index('Sales') # Assuming numerical_features from original scaling of dataset
-        # dummy_features = np.zeros((1, len(numerical_features)))
-        # dummy_features[0, sales_idx] = prediction[0]
-        # original_sales = original_sales_scaler.inverse_transform(dummy_features)[:, sales_idx]
         
         # For this Flask app, we'll return the raw (scaled) prediction.
         
