@@ -6,7 +6,11 @@ from pathlib import Path
 
 # 1. Load the pre-trained ARIMA model (file-relative path)
 BASE_DIR = Path(__file__).resolve().parent
-model_arima_fit = joblib.load(str(BASE_DIR / 'arima_model.joblib'))
+model_arima_fit = None
+try:
+    model_arima_fit = joblib.load(str(BASE_DIR / 'arima_model.joblib'))
+except Exception as e:
+    print(f"Warning: could not load ARIMA model: {e}")
 
 # NOTE: For ARIMA, the historical data (train_data) is crucial for determining
 # the forecast start/end points. We need to recreate or load this.
@@ -48,69 +52,64 @@ def preprocess_input_for_arima(data):
     if forecast_horizon <= 0:
         raise ValueError("Forecast date must be after the last training date (2019-02-16).")
 
-    # The 'start' index for prediction is the length of the training data
-    start_index = ARIMA_TRAIN_DATA_LENGTH
-    # The 'end' index is start_index + forecast_horizon - 1
-    end_index = start_index + forecast_horizon - 1
-
-    return start_index, end_index
+    # We only need the forecast horizon (number of steps ahead)
+    return int(forecast_horizon)
 
 # 3. Initialize the Flask application
 app = Flask(__name__)
-# allow routes to be requested with or without trailing slashes
-app.url_map.strict_slashes = False
 
-# 4. Create a prediction endpoint for ARIMA
+# 4. Create a prediction endpoint for ARIMA (support GET for health-check + usage)
 @app.route('/predict_arima', methods=['GET', 'POST'])
 def predict_arima():
-    # If called with GET, return a health-check / usage message so browsers and Run buttons don't get 404/405
+    # GET -> simple health-check and usage example
     if request.method == 'GET':
         return jsonify({
             'status': 'ok',
-            'message': 'Send a POST with JSON {"Date": "YYYY-MM-DD"} to get a forecast',
-            'endpoint': '/predict_arima',
-            'example_curl': "curl -X POST -H \"Content-Type: application/json\" -d '{\"Date\": \"2019-06-01\"}' http://127.0.0.1:5000/predict_arima"
+            'usage': 'POST JSON {"Date":"YYYY-MM-DD"} to this endpoint to get forecast',
+            'example': '/predict_arima with POST body {"Date":"2019-06-01"}'
         })
 
     try:
         data = request.get_json(force=True)
-        start_index, end_index = preprocess_input_for_arima(data)
+        forecast_horizon = preprocess_input_for_arima(data)
+        if forecast_horizon <= 0:
+            return jsonify({'error': 'Forecast horizon must be positive.'}), 400
+        if model_arima_fit is None:
+            return jsonify({'error': 'ARIMA model not loaded on server.'}), 500
 
-        # Generate ARIMA predictions
-        arima_prediction_series = model_arima_fit.predict(start=start_index, end=end_index, dynamic=False)
-
-        # The last value corresponds to the requested input_date.
-        predicted_sales = arima_prediction_series.iloc[-1].item()
-
-        return jsonify({'predicted_sales_arima': predicted_sales})
+        # Use get_forecast to produce out-of-sample forecasts for the horizon
+        try:
+            forecast = model_arima_fit.get_forecast(steps=forecast_horizon)
+            # predicted_mean is a pandas Series; the last element corresponds to the requested date
+            predicted_sales = float(forecast.predicted_mean.iloc[-1])
+            return jsonify({'predicted_sales_arima': predicted_sales})
+        except AttributeError:
+            # Some saved models may not implement get_forecast; fall back to predict with indices
+            try:
+                start_index = ARIMA_TRAIN_DATA_LENGTH
+                end_index = start_index + forecast_horizon - 1
+                arima_prediction_series = model_arima_fit.predict(start=start_index, end=end_index, dynamic=False)
+                predicted_sales = float(arima_prediction_series.iloc[-1])
+                return jsonify({'predicted_sales_arima': predicted_sales})
+            except Exception as ex:
+                return jsonify({'error': f'ARIMA fallback prediction failed: {ex}'}), 500
+        except Exception as ex:
+            return jsonify({'error': f'ARIMA forecast failed: {ex}'}), 500
     except ValueError as ve:
         return jsonify({'error': str(ve)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-
-# root health endpoint listing available endpoints
-@app.route('/', methods=['GET'])
-def index():
-    return jsonify({
-        'status': 'ok',
-        'endpoints': {
-            'arima_predict': '/predict_arima',
-            'lr_predict': '/predictSales'
-        },
-        'message': 'Use GET on /predict_arima for instructions or POST JSON to that endpoint.'
-    })
-
 # To run the Flask app, you would typically save this code as app_arima.py and run `flask run`
 # For demonstration purposes, we can include a main block here.
 if __name__ == '__main__':
     host = '127.0.0.1'
-    port = 5000
+    port = 5001
     print("Flask ARIMA app loaded. Starting development server...")
     print(f"Endpoint: http://{host}:{port}/predict_arima")
     print("Example curl:")
-    print("curl -X POST -H \"Content-Type: application/json\" -d '{\"Date\": \"2019-06-01\"}' http://127.0.0.1:5000/predict_arima")
-    # Print registered routes to help debug 404s when Run-button is used
+    print("curl -X POST -H \"Content-Type: application/json\" -d '{\"Date\": \"2019-06-01\"}' http://127.0.0.1:5001/predict_arima")
+    # Print registered routes to help debug method/404 issues
     print("Registered routes:")
     for rule in app.url_map.iter_rules():
         methods = ','.join(sorted(rule.methods - {"HEAD", "OPTIONS"}))
