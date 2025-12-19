@@ -12,27 +12,8 @@ try:
 except Exception as e:
     print(f"Warning: could not load ARIMA model: {e}")
 
-# NOTE: For ARIMA, the historical data (train_data) is crucial for determining
-# the forecast start/end points. We need to recreate or load this.
-# Assuming 'daily_sales' and 'train_data' from the notebook context are available
-# or can be recreated from the original dataset.
-# For a standalone Flask app, you'd typically save this alongside the model.
-# Let's assume for this example, we re-create it minimally.
-# In a real scenario, you would save and load the train_data's length or last_date.
 
-# Re-create daily_sales and train_data context for determining forecast indices
-# In a production setup, you would load these pre-computed values or indices.
-# This is a simplification based on the previous notebook cells.
-# Here, we will just use the length of the train_data from the notebook state
-# (which was 412 entries up to 2019-02-16).
-# The ARIMA model's predictions are based on its internal state, but for 'predict'
-# with start/end indices, those indices relate to the original series length.
-# The length of `train_data` was 412.
-# The length of `validation_data` was 104.
 
-# We'll need the total length of the series used to train the model to correctly
-# calculate the `start` index for `predict` in the Flask app.
-# In the notebook, `train_data` had 412 entries.
 ARIMA_TRAIN_DATA_LENGTH = 412 # This should ideally be loaded from a saved config or determined dynamically
 ARIMA_LAST_TRAIN_DATE = pd.to_datetime('2019-02-16') # This should ideally be loaded
 
